@@ -4,10 +4,10 @@
 #  Dr. Orion Lawlor, lawlor@alaska.edu, 2015-03-25 (Public Domain)
 from hashlib import sha256
 from random import SystemRandom  # cryptographic random byte generator
-#from Oracle import Oracle
+
+# from Oracle import Oracle
 
 rand = SystemRandom()  # create strong random number generator
-
 
 
 def hex2int(hexString):
@@ -15,7 +15,7 @@ def hex2int(hexString):
 
 
 # Half the extended Euclidean algorithm:
-#    Computes   gcd(a,b) = a*x + b*y  
+#    Computes   gcd(a,b) = a*x + b*y
 #    Returns only gcd, x (not y)
 # From http://rosettacode.org/wiki/Modular_inverse#Python
 def half_extended_gcd(aa, bb):
@@ -79,12 +79,12 @@ class ECcurve:
     # Return a doubled version of this elliptic curve point
     #  Closely follows Gueron & Krasnov 2013 figure 2
     def double(self, Q):
-        if (Q.x == self.p):  # doubling the identity
+        if Q.x == self.p:  # doubling the identity
             return Q
         S = (4 * Q.x * Q.y * Q.y) % self.p
         Z2 = Q.z * Q.z
         Z4 = (Z2 * Z2) % self.p
-        M = (3 * Q.x * Q.x + self.a * Z4)
+        M = 3 * Q.x * Q.x + self.a * Z4
         x = (M * M - 2 * S) % self.p
         Y2 = Q.y * Q.y
         y = (M * (S - x) - 8 * Y2 * Y2) % self.p
@@ -95,9 +95,9 @@ class ECcurve:
     #  Closely follows Gueron & Krasnov 2013 figure 2
     def add(self, Q1, Q2):
         # Identity special cases
-        if (Q1.x == self.p):  # Q1 is identity
+        if Q1.x == self.p:  # Q1 is identity
             return Q2
-        if (Q2.x == self.p):  # Q2 is identity
+        if Q2.x == self.p:  # Q2 is identity
             return Q1
         Q1z2 = Q1.z * Q1.z
         Q2z2 = Q2.z * Q2.z
@@ -107,8 +107,8 @@ class ECcurve:
         ys2 = (Q2.y * Q1z2 * Q1.z) % self.p
 
         # Equality special cases
-        if (xs1 == xs2):
-            if (ys1 == ys2):  # adding point to itself
+        if xs1 == xs2:
+            if ys1 == ys2:  # adding point to itself
                 return self.double(Q1)
             else:  # vertical pair--result is the identity
                 return self.identity()
@@ -129,12 +129,12 @@ class ECcurve:
         R = self.identity()  # return point
         while m != 0:  # binary multiply loop
             if m & 1:  # bit is set
-                # print("  mul: adding Q to R =",R);
+                # print("  mul: adding Q to R =",R)
                 R = self.add(R, Q)
-            # print("  mul: added Q to R =",R);
+            # print("  mul: added Q to R =",R)
             m = m >> 1
-            if (m != 0):
-                # print("  mul: doubling Q =",Q);
+            if m != 0:
+                # print("  mul: doubling Q =",Q)
                 Q = self.double(Q)
 
         return R
@@ -153,7 +153,7 @@ class ECpoint:
 
     # This self-check has a big performance cost.
     # if not x==curve.p and not curve.touches(self):
-    #	print(" ECpoint left curve: ",self)
+    # 	print(" ECpoint left curve: ",self)
 
     # "Add" this point to another point on the same curve
     def add(self, Q2):
@@ -166,14 +166,14 @@ class ECpoint:
     # Extract non-projective X and Y coordinates
     #   This is the only time we need the expensive modular inverse
     def get_x(self):
-        return self.curve.field_div(self.x, (self.z * self.z) % self.curve.p);
+        return self.curve.field_div(self.x, (self.z * self.z) % self.curve.p)
 
     def get_y(self):
-        return self.curve.field_div(self.y, (self.z * self.z * self.z) % self.curve.p);
+        return self.curve.field_div(self.y, (self.z * self.z * self.z) % self.curve.p)
 
     # Print this ECpoint
     def __str__(self):
-        if (self.x == self.curve.p):
+        if self.x == self.curve.p:
             return "identity_point"
         else:
             return "(" + str(self.get_x()) + ", " + str(self.get_y()) + ")"
@@ -183,55 +183,75 @@ class ECpoint:
 #   See http://www.secg.org/SEC2-Ver-1.0.pdf
 def set_secp256p1():
     secp256k1 = ECcurve()
-    secp256k1.p = hex2int("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+    secp256k1.p = hex2int(
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"
+    )
     secp256k1.a = 0  # it's a Koblitz curve, with no linear part
     secp256k1.b = 7
     # n is the order of the curve, used for ECDSA
-    secp256k1.n = hex2int("FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141");
+    secp256k1.n = hex2int(
+        "FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141"
+    )
 
     # SEC's "04" means they're representing the generator point's X,Y parts explicitly.
-    secp256k1.G = ECpoint(curve=secp256k1,
-                          x=hex2int("79BE667E F9DCBBAC 55A06295 CE870B07 029BFCDB 2DCE28D9 59F2815B 16F81798"),
-                          y=hex2int("483ADA77 26A3C465 5DA4FBFC 0E1108A8 FD17B448 A6855419 9C47D08F FB10D4B8"),
-                          z=1  # projective coordinates, start with Z==1
-                          );
+    secp256k1.G = ECpoint(
+        curve=secp256k1,
+        x=hex2int(
+            "79BE667E F9DCBBAC 55A06295 CE870B07 029BFCDB 2DCE28D9 59F2815B 16F81798"
+        ),
+        y=hex2int(
+            "483ADA77 26A3C465 5DA4FBFC 0E1108A8 FD17B448 A6855419 9C47D08F FB10D4B8"
+        ),
+        z=1,  # projective coordinates, start with Z==1
+    )
     return secp256k1
+
+
 # Hash the message M and the curve point R
 #  (this isn't any offical scheme, but a simple ASCII concatenation)
 def hashThis(M: object, C: object) -> object:
-    hash = sha256();
-    hash.update(M.encode());
-    #    hash.update(str(R).encode());
-    hash.update(str(C).encode());
-    return int(hash.hexdigest(), 16);  # part 1 of signature
+    hash = sha256()
+    hash.update(M.encode())
+    #    hash.update(str(R).encode())
+    hash.update(str(C).encode())
+    return int(hash.hexdigest(), 16)
+    # part 1 of signature
 
 
 def hashOne(M: object) -> object:
-    hash = sha256();
-    hash.update(M.encode());
-    #    hash.update(str(R).encode());
-    # hash.update(str(C).encode());
-    return str(int(hash.hexdigest(), 16));  # part 1 of signature
+    hash = sha256()
+    hash.update(M.encode())
+    #    hash.update(str(R).encode())
+    # hash.update(str(C).encode())
+    return str(int(hash.hexdigest(), 16))
+    # part 1 of signature
+
 
 def getCurve():
     curve = set_secp256p1()
-    return curve.G, curve.n;
+    return curve.G, curve.n
 
-G, n = getCurve();  # generator of curve
+
+G, n = getCurve()
+# generator of curve
+
 
 def generate_privkey():
-    return rand.getrandbits(256) % n;
+    return rand.getrandbits(256) % n
 
 
 def determine_pubkey(d):
     return G.mul(d)  # move down curve by x to make public key
     # return str(d.pub().to_address())
 
+
 def initialize_variables():
-    #a = Oracle();
-    #A = determine_pubkey(a);
-    #    k = rand.getrandbits(256) % n;  # message nonce
-    k = generate_privkey(n);  # message nonce
-    #    R = G.mul(k);  # used to encode
-    R = determine_pubkey(k);  # used to encode
-    return k, R #a, A, k, R
+    # a = Oracle()
+    # A = determine_pubkey(a)
+    #    k = rand.getrandbits(256) % n  # message nonce
+    k = generate_privkey(n)
+    # message nonce
+    #    R = G.mul(k)  # used to encode
+    R = determine_pubkey(k)
+    # used to encode
+    return k, R  # a, A, k, R

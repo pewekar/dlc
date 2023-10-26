@@ -1,53 +1,112 @@
-from Bob import hexBob,Bob_pubkey
-from btcpy.structs.crypto import PrivateKey,PublicKey
+from Bob import hexBob, Bob_pubkey
+from btcpy.structs.crypto import PrivateKey, PublicKey
 from Txn import get_solver
 from btcpy.structs.script import IfElseScript, P2pkhScript, RelativeTimelockScript
 from dlcO import dlcO
-from schnorr import determine_pubkey,n
+from schnorr import determine_pubkey, n
 
-def generate_contract_priv(s, privkey): #TODO separate out privkey processing
-    privContract = (privkey+s) % n; # Verified pubkey can be derived independently #Todo Gives 'Odd length string' error sometimes
-    privk =PrivateKey.unhexlify(format(privContract,'x'))#hex(privContract).split('x')[-1])); # format(privContract,'x')
-    return privk; #pubContract,privContract
 
-def generate_contract_pub(S, pubkey): #TODO separate out privkey processing
-    pubContract=pubkey.add(S);
-    pubk = get_hexPubkey(pubContract); # todo verify pubkey calc
-    return pubk; #pubContract,privContract
+"""
+Generates a DLC contract script and a funding transaction for the given message.
 
-def get_outscript(pubContract):#, pubkey_other): #ToDO generate using Pybtc library
-    pubscript = P2pkhScript(pubContract)
-    return pubscript;
+Args:
+    msg: The message to bet on.
 
-def get_hexPubkey(decPubkey):
-    pubk = PublicKey(bytearray([0x04])
-                     + decPubkey.get_x().to_bytes(32, 'big')
-                     + decPubkey.get_y().to_bytes(32, 'big'))
-    pubk = pubk.compress()
-    return pubk;
+Returns:
+    A tuple of five values:
+        * ContractPrivkeyB: The private key for Bob's contract script.
+        * ContractScriptSigB_IF: The signature script for Bob to claim the contract if the message matches his chosen outcome.
+        * ContractScriptSigB_ELSE: The signature script for Bob to claim the contract if the message does not match his chosen outcome.
+        * ContractPubkeyB: The public key for Bob's contract script.
+        * ContractPubScriptB: The P2PKH script for Bob's contract script.
+"""
 
-def priv_process(key,s):
-    privkey =int(key,16);
-    pubkey=determine_pubkey(privkey)
-    ContractPrivkey=generate_contract_priv(s,privkey);
-    ContractScriptSig_IF,ContractScriptSig_ELSE=get_solver(ContractPrivkey)
-    return privkey,pubkey,ContractPrivkey,ContractScriptSig_IF,ContractScriptSig_ELSE;
 
-def pub_process(pubkey,S):
-    #pubkey=determine_pubkey(priv)#G.add(int(pub.hexlify(),16)) #ToDO Failing  Must check
-    ContractPubkey=generate_contract_pub(S,pubkey);
-    ContractPubScript=get_outscript(ContractPubkey)
-    return ContractPubkey,ContractPubScript;
+def dlcB(msg):
+    """Generates a DLC contract script and a funding transaction for the given message.
 
-def dlcB(msg): #TODO Seperate out private key processing for B. It should not reside in the same routine
-    s,S=dlcO(msg);
-    privkeyB,pubkeyB,ContractPrivkeyB,ContractScriptSigB_IF,ContractScriptSigB_ELSE = priv_process(hexBob, s)
-    ContractPubkeyB,ContractPubScriptB = pub_process(pubkeyB,S)
-    return ContractPrivkeyB,ContractScriptSigB_IF,ContractScriptSigB_ELSE,ContractPubkeyB,ContractPubScriptB
+    Args:
+        msg: The message to bet on.
+
+    Returns:
+        A tuple of five values:
+            * ContractPrivkeyB: The private key for Bob's contract script.
+            * ContractScriptSigB_IF: The signature script for Bob to claim the contract if the message matches his chosen outcome.
+            * ContractScriptSigB_ELSE: The signature script for Bob to claim the contract if the message does not match his chosen outcome.
+            * ContractPubkeyB: The public key for Bob's contract script.
+            * ContractPubScriptB: The P2PKH script for Bob's contract script.
+    """
+
+    s, S = dlcO(msg)
+    (
+        privkeyB,
+        pubkeyB,
+        ContractPrivkeyB,
+        ContractScriptSigB_IF,
+        ContractScriptSigB_ELSE,
+    ) = priv_process(hexBob, s)
+    ContractPubkeyB, ContractPubScriptB = pub_process(pubkeyB, S)
+    return (
+        ContractPrivkeyB,
+        ContractScriptSigB_IF,
+        ContractScriptSigB_ELSE,
+        ContractPubkeyB,
+        ContractPubScriptB,
+    )
+
+
+def priv_process(key, s):
+    """
+    Processes Bob's private key and generates the necessary values for the DLC contract script.
+
+    Args:
+        key: Bob's private key.
+        s: A random secret salt.
+
+    Returns:
+        A tuple of five values:
+            * privkey: Bob's private key.
+            * pubkey: Bob's public key.
+            * ContractPrivkey: The private key for Bob's contract script.
+            * ContractScriptSig_IF: The signature script for Bob to claim the contract if the message matches his chosen outcome.
+            * ContractScriptSig_ELSE: The signature script for Bob to claim the contract if the message does not match his chosen outcome.
+    """
+    privkey = int(key, 16)
+    pubkey = determine_pubkey(privkey)
+    ContractPrivkey = generate_contract_priv(s, privkey)
+    ContractScriptSig_IF, ContractScriptSig_ELSE = get_solver(ContractPrivkey)
+    return (
+        privkey,
+        pubkey,
+        ContractPrivkey,
+        ContractScriptSig_IF,
+        ContractScriptSig_ELSE,
+    )
+
+
+def pub_process(pubkey, S):
+    """
+    Processes Bob's public key and generates the necessary values for the DLC contract script.
+
+    Args:
+        pubkey: Bob's public key.
+        S: The public key for Bob's contract script.
+
+    Returns:
+        A tuple of two values:
+            * ContractPubkey: The public key for Bob's contract script.
+            * ContractPubScript: The P2PKH script for Bob's contract script.
+    """
+    ContractPubkey = generate_contract_pub(S, pubkey)
+    ContractPubScript = get_outscript(ContractPubkey)
+    return ContractPubkey, ContractPubScript
+
 
 def pubkeyB():
-    #priv_key=PrivateKey.unhexlify(Bob())
-    return Bob_pubkey;#priv_key.pub()
+    """
+    Returns Bob's public key.
 
-#if __name__ == "__main__":
-#    main()
+    Returns:
+        A string representing Bob's public key.
+    """
+    return Bob_pubkey

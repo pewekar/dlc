@@ -1,132 +1,223 @@
 import sys
-#from time import time  # timing
-#from Alice import Alice#,Alice_pubkey#
-from btcpy.structs.crypto import PrivateKey,PublicKey
+
+from btcpy.structs.crypto import PrivateKey, PublicKey
 from Txn import get_solver
-#from schnorr import hashThis,determine_pubkey,n,ECpoint
+
 from btcpy.structs.script import IfElseScript, P2pkhScript, RelativeTimelockScript
-from dlcF import fundingTxn,fundingInput_value,sweepTx #sendBack,fundingTxIn,
+from dlcF import fundingTxn, fundingInput_value, sweepTx  # sendBack,fundingTxIn,
 from Oracle import Oracle
-#from btcpy.setup import setup
-from schnorr import determine_pubkey,generate_privkey,n,hashThis
 
-#setup('testnet')
+from schnorr import determine_pubkey, generate_privkey, n, hashThis
 
-'''
-def value_split(contractValue,ratio): # TODo Accept a list of ratios or even absolute values with error checks
-    first=int(round(contractValue*ratio))
-    return [first,contractValue-first]
+nonce = generate_privkey()  # message nonce
+a = Oracle
+k = nonce
 
-def set_choice(): # for Alice
-    chosen_message ="sun"#input(user_prompt);
-    print("Alice chose ",chosen_message)
-    return chosen_message
 
-def set_messageOptions():
-    if len(sys.argv) > 1:  # =2:
-        messageOptions = sys.argv[1].split(
-            ',');  # pass a comma-separated string (without the brackets):python3 test.py 1,2,3,4,5 0
-        #    lockTime = sys.argv[2]
-        return messageOptions;  # lockTime;
-    else:
-        sys.exit("List of outcomes not specified");
-'''
-nonce = generate_privkey()# message nonce
-a=Oracle
-k=nonce
+def OraclePub():  #
+    """Returns the Oracle's public key."""
+    return determine_pubkey(a)
 
-def OraclePub(): #
-    return determine_pubkey(a);
 
-A=OraclePub() # Part 1 of Pubkey
+A = OraclePub()  # Part 1 of Pubkey
+
 
 def onetimekey():
-    R = determine_pubkey(k);  # used to encode
+    """Returns a one-time key used to encode messages."""
+    R = determine_pubkey(k)
     return R
 
-R = onetimekey();  # Part 2 of pubkey TODO remove direct dependency on k from DLC
 
-def generate_contract_priv(s, privkey): #TODO separate out privkey processing
-    privContract = (privkey+s) % n; # Verified pubkey can be derived independently #Todo Gives 'Odd length string' error sometimes
-    privk =PrivateKey.unhexlify(format(privContract,'x'))#hex(privContract).split('x')[-1])); # format(privContract,'x')
-    return privk; #pubContract,privContract
+R = onetimekey()
+# Part 2 of pubkey TODO remove direct dependency on k from DLC
 
-def generate_contract_pub(S, pubkey): #TODO separate out privkey processing
-    #S = determine_pubkey(G, s);
-    pubContract=pubkey.add(S);
-    pubk = get_hexPubkey(pubContract); # todo verify pubkey calc
-    return pubk; #pubContract,privContract
+
+def generate_contract_priv(s, privkey):  # TODO separate out privkey processing
+    """Generates a contract private key.
+
+    Args:
+        s: The secret key.
+        privkey: The private key.
+
+    Returns:
+        The contract private key.
+    """
+    privContract = (privkey + s) % n
+    privk = PrivateKey.unhexlify(format(privContract, "x"))
+    return privk
+
+
+def generate_contract_pub(S, pubkey):  # TODO separate out privkey processing
+    """Generates a contract public key.
+
+    Args:
+        S: The public key of the contract.
+        pubkey: The public key.
+
+    Returns:
+        The contract public key.
+    """
+    pubContract = pubkey.add(S)
+    pubk = get_hexPubkey(pubContract)
+    return pubk
+
 
 def get_sig(msg):
-    e = hashThis(msg, R);  # part 1 of signature
-    s = (k + e * a) % n;#s = (k - e * a) % n;  # part 2 of signature
-    return s  # signature
-'''
-def get_sig1(msg):
-    return hashThis(msg, R);  # part 1 of signature
+    """Generates a signature for a message.
 
-def get_sig2(e):
-    return (k - e * a) % n;#s = (k - e * a) % n;  # part 2 of signature
-'''
+    Args:
+        msg: The message to sign.
+
+    Returns:
+        The signature.
+    """
+    e = hashThis(msg, R)
+    s = (k + e * a) % n
+    return s
+
 
 def pub_sig(msg):
-    return R.add(A.mul(hashThis(msg,R)))  # TOdo - doesent seem to work
+    """Generates a public key signature for a message.
 
-def get_outscript(pubContract):#, pubkey_other): #ToDO generate using Pybtc library
+    Args:
+        msg: The message to sign.
+
+    Returns:
+        The public key signature.
+    """
+    return R.add(A.mul(hashThis(msg, R)))
+
+
+def get_outscript(pubContract):  # , pubkey_other): #ToDO generate using Pybtc library
+    """Generates an output script for a contract public key.
+
+    Args:
+        pubContract: The contract public key.
+
+    Returns:
+        The output script.
+    """
     pubscript = P2pkhScript(pubContract)
-    return pubscript;
+    return pubscript
+
 
 def setSelectedScript(selectedMessage, outputScriptA, outputScriptB):
-    selectedScriptA = outputScriptA[selectedMessage];
-    selectedScriptB = outputScriptB[selectedMessage];
-    return selectedScriptA, selectedScriptB;
+    """Selects the appropriate script for a given message.
+
+    Args:
+        selectedMessage: The message to select the script for.
+        outputScriptA: The output script for party A.
+        outputScriptB: The output script for party B.
+
+    Returns:
+        The selected script.
+    """
+    selectedScriptA = outputScriptA[selectedMessage]
+    selectedScriptB = outputScriptB[selectedMessage]
+    return selectedScriptA, selectedScriptB
+
 
 def get_hexPubkey(decPubkey):
-    pubk = PublicKey(bytearray([0x04])
-                     + decPubkey.get_x().to_bytes(32, 'big')
-                     + decPubkey.get_y().to_bytes(32, 'big'))
+    """Converts a decimal public key to a hexadecimal public key.
+
+    Args:
+        decPubkey: The decimal public key.
+
+    Returns:
+        The hexadecimal public key.
+    """
+    pubk = PublicKey(
+        bytearray([0x04])
+        + decPubkey.get_x().to_bytes(32, "big")
+        + decPubkey.get_y().to_bytes(32, "big")
+    )
     pubk = pubk.compress()
-    return pubk;
+    return pubk
 
-def priv_process(key,s):
-    privkey =int(key,16);
-    pubkey=determine_pubkey(privkey)
-    ContractPrivkey=generate_contract_priv(s,privkey);
-    ContractScriptSig_IF,ContractScriptSig_ELSE=get_solver(ContractPrivkey)
-    return privkey,pubkey,ContractPrivkey,ContractScriptSig_IF,ContractScriptSig_ELSE;
 
-def pub_process(pubkey,S):
-    ContractPubkey=generate_contract_pub(S,pubkey);
-    ContractPubScript=get_outscript(ContractPubkey)
-    return ContractPubkey,ContractPubScript;
+def priv_process(key, s):
+    """Processes a private key and generates the contract private key and script sigs.
 
-def dlcO(msg): #TODO Seperate out private key processing. It should not reside in the same routine
-    s=get_sig(msg)
-    S= pub_sig(msg);
-    return s,S
+    Args:
+        key: The private key in hexadecimal format.
+        s: The secret key.
+
+    Returns:
+        A tuple containing the private key, public key, contract private key, contract script sig IF, and contract script sig ELSE.
+    """
+
+    privkey = int(key, 16)
+    pubkey = determine_pubkey(privkey)
+    ContractPrivkey = generate_contract_priv(s, privkey)
+    ContractScriptSig_IF, ContractScriptSig_ELSE = get_solver(ContractPrivkey)
+    return (
+        privkey,
+        pubkey,
+        ContractPrivkey,
+        ContractScriptSig_IF,
+        ContractScriptSig_ELSE,
+    )
+
+
+def pub_process(pubkey, S):
+    """Processes a public key and generates the contract public key and output script.
+
+    Args:
+        pubkey: The public key.
+        S: The public key of the contract.
+
+    Returns:
+        A tuple containing the contract public key and output script.
+    """
+
+    ContractPubkey = generate_contract_pub(S, pubkey)
+    ContractPubScript = get_outscript(ContractPubkey)
+    return ContractPubkey, ContractPubScript
+
+
+def dlcO(
+    msg,
+):  # TODO Seperate out private key processing. It should not reside in the same routine
+    """Generates a signature and public key signature for a message.
+
+    Args:
+        msg: The message to sign.
+
+    Returns:
+        A tuple containing the signature and public key signature.
+    """
+
+    s = get_sig(msg)
+    S = pub_sig(msg)
+    return s, S
+
 
 def pubkeyO():
-    priv_key=PrivateKey.unhexlify(Oracle())
+    """Returns the public key of the Oracle."""
+
+    priv_key = PrivateKey.unhexlify(Oracle())
     return priv_key.pub()
 
 
-
 def set_message(messageOptions):
+    """Selects a message from a list of options.
+
+    Args:
+        messageOptions: A list of message options.
+
+    Returns:
+        The selected message.
+    """
+
     import sys
     from dlc import set_choice
+
     count = 1
     while count < len(messageOptions):
         user_prompt = "Select one from " + str(messageOptions) + ", Alice: "
-        selection = set_choice()#input(user_prompt);
+        selection = set_choice()  # input(user_prompt)
         if selection in messageOptions:
-            return selection;  # message
+            return selection
         else:
-            count = count + 1;
-    sys.exit("Wrong option selected");
-
-
-
- #a, A, k, R
-
-    #if __name__ == "__main__":
-    #    main()
+            count = count + 1
+    sys.exit("Wrong option selected")
